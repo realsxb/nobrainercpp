@@ -1,0 +1,84 @@
+{
+  "name": "nobrainercpp",
+  "displayName": "NoBrainerCpp",
+  "publisher": "Nebulazeyv",
+  "description": "F5 to debug C/C++. No setup, no brain, no problem.",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:c",
+    "onLanguage:cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "easycpp.debugC",
+        "title": "Debug C (GCC)"
+      },
+      {
+        "command": "easycpp.debugCpp",
+        "title": "Debug C++ (G++)"
+      },
+      {
+        "command": "extension.autoDebug",
+        "title": "Smart Run C/C++",
+        "category": "C/C++",
+        "icon": {
+          "light": "smartstart.svg",
+          "dark": "smartstart.svg"
+        }
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "easycpp.debugC",
+        "key": "ctrl+alt+c",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "easycpp.debugCpp",
+        "key": "ctrl+alt+d",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "extension.autoDebug"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "extension.autoDebug",
+          "when": "resourceLangId == cpp || resourceLangId == c",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "pnpm run compile && pnpm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.105.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "eslint": "^9.36.0",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
