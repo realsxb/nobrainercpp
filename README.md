@@ -1,3 +1,24 @@
+依赖:
+D:\jscode\nobrainercpp>pnpm install
+Lockfile is up to date, resolution step is skipped
+Packages: +236
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ WARN  Tarball download average speed 32 KiB/s (size 99 KiB) is below 50 KiB/s: https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.0.tgz (GET)
+Progress: resolved 236, reused 0, downloaded 236, added 236, done
+
+devDependencies:
++ @types/mocha 10.0.10
++ @types/node 22.18.10
++ @types/vscode 1.105.0
++ @typescript-eslint/eslint-plugin 8.46.1
++ @typescript-eslint/parser 8.46.1
++ @vscode/test-cli 0.0.11
++ @vscode/test-electron 2.5.2
++ eslint 9.37.0
++ typescript 5.9.3
+
+Done in 5.2s using pnpm v10.28.2
+
 # nobrainercpp README
 
 This is the README for your extension "nobrainercpp". After writing up a brief description, we recommend including the following sections.

@@ -13,7 +13,7 @@ const toolchainState = {
     
     // 工具链查找完成状态
     completed: {
-        gnu: false,*
+        gnu: false,
         clang: false,
         msvc: false
     },
