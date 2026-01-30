@@ -1,234 +1,229 @@
-import * as vscode from 'vscode';
-// 全局状态存储
+import * as childProcess from 'child_process';
+import * as fs from 'fs';
 
+// --- 类型定义 ---
+export interface ToolchainResult {
+    toolchain: 'gnu' | 'clang' | 'msvc' | 'combo';
+    compilers: {
+        c?: string;
+        cpp?: string;
+    };
+    debugger?: string;
+}
+
+interface ToolchainDiscoveryResult {
+    compilers: { c?: string; cpp?: string; };
+    debugger?: string;
+}
+
+// --- 全局状态管理 ---
 const toolchainState = {
-    // 各工具链查找结果存储
     results: {
-        gnu: null as { compilers: Record<string, string>, debugger?: string } | null,
-        clang: null as { compilers: Record<string, string>, debugger?: string } | null,
-        msvc: null as { compilers: Record<string, string>, debugger?: string } | null
-        
+        gnu: null as ToolchainDiscoveryResult | null,
+        clang: null as ToolchainDiscoveryResult | null,
+        msvc: null as ToolchainDiscoveryResult | null
     },
-    
-    
-    // 工具链查找完成状态
     completed: {
         gnu: false,
         clang: false,
         msvc: false
     },
-    
-    // 最终选择的工具链（用于后续调试）
-    selected: null as { 
-        toolchain: 'gnu' | 'clang' | 'msvc' | 'combo',
-        compilers: Record<string, string>,
-        debugger: string
-    } | null,
-    
-    // 首次完整工具链（用于立即调试）
-    firstComplete: null as any,
-    
-    // 回调队列
+    selected: null as ToolchainResult | null,
+    firstComplete: null as ToolchainResult | null,
     callbacks: {
-        onFirstComplete: [] as Function[],
-        onAllComplete: [] as Function[]
+        onFirstComplete: [] as ((res: ToolchainResult) => void)[],
+        onAllComplete: [] as ((res: ToolchainResult) => void)[]
     },
+    isSearching: false
 };
-// ✅ 解决方案：直接限定为合法键
-type ValidToolName = keyof typeof toolchainState.results; // "gnu" | "clang" | "msvc"
 
-function getCompilerSafe(
-    name: ValidToolName, 
-    lang: string
-): string | undefined {
-    const tool = toolchainState.results[name]; // ✅ 类型安全
-    return tool?.compilers[lang];
+// --- 核心查找工具函数 ---
+async function findExecutable(binName: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        // Windows 用 where, Unix 用 which
+        const command = platform === 'win32' ? `where ${binName}` : `which ${binName}`;
+        
+        childProcess.exec(command, (error, stdout) => {
+            if (error || !stdout) {
+                resolve(null);
+                return;
+            }
+            // 取第一行结果，去除空白
+            const paths = stdout.toString().split(/\r?\n/);
+            const firstPath = paths[0].trim();
+            if (firstPath && fs.existsSync(firstPath)) {
+                resolve(firstPath);
+            } else {
+                resolve(null);
+            }
+        });
+    });
 }
 
-// 处理外部输入：运行时验证
-function getCompilerFromInput(
-    inputName: string, 
-    lang: string
-): string | undefined {
-    
-    // 1. 创建合法键常量列表
-    const validNames = ["gnu", "clang", "msvc"] as const;
-    
-    // 2. 运行时检查
-    if (validNames.includes(inputName as any)) {
-        // 3. 类型断言仅在检查后使用
-        return getCompilerSafe(
-            inputName as ValidToolName, 
-            lang
-        );
-    }
-    
-    // 4. 处理无效键情况
-    console.warn(`Invalid toolchain: ${inputName}`);
-    return undefined;
-}
-//-----------------------------------------------------------------------------以下为查找-----------------
-// GNU工具链查找器
+// --- 具体工具链查找器 ---
+
 async function findGnuToolchain() {
     try {
-        const gcc = await findExecutable('gcc');
-        const gxx = await findExecutable('g++');
-        const debugger = await findDebugger('gdb');
-        
-        const result = {
-            compilers: {
-                'c': gcc?.path,
-                'cpp': gxx?.path
-            },
-            debugger: debugger?.path
+        const [gcc, gxx, gdb] = await Promise.all([
+            findExecutable('gcc'),
+            findExecutable('g++'),
+            findExecutable('gdb')
+        ]);
+
+        const result: ToolchainDiscoveryResult = {
+            compilers: { c: gcc || undefined, cpp: gxx || undefined },
+            debugger: gdb || undefined
         };
         
-        onToolchainFound('gnu', result);
-    } catch (error) {
+        // 只要有编译器就算找到
+        if (result.compilers.c || result.compilers.cpp) {
+            onToolchainFound('gnu', result);
+        } else {
+            onToolchainFound('gnu', null);
+        }
+    } catch {
         onToolchainFound('gnu', null);
     }
 }
 
-// Clang工具链查找器
 async function findClangToolchain() {
-    // 类似findGnuToolchain的逻辑
-    // ... 
-    onToolchainFound('clang', result);
+    try {
+        const [clang, clangxx, lldb] = await Promise.all([
+            findExecutable('clang'),
+            findExecutable('clang++'),
+            findExecutable('lldb')
+        ]);
+
+        const result: ToolchainDiscoveryResult = {
+            compilers: { c: clang || undefined, cpp: clangxx || undefined },
+            debugger: lldb || undefined
+        };
+
+        if (result.compilers.c || result.compilers.cpp) {
+            onToolchainFound('clang', result);
+        } else {
+            onToolchainFound('clang', null);
+        }
+    } catch {
+        onToolchainFound('clang', null);
+    }
 }
 
-// MSVC工具chain查找器
 async function findMsvcToolchain() {
-    // 类似findGnuToolchain的逻辑
-    // ... 
-    onToolchainFound('msvc', result);
+    try {
+        const cl = await findExecutable('cl');
+        if (cl) {
+            onToolchainFound('msvc', {
+                compilers: { c: cl, cpp: cl },
+                debugger: undefined // MSVC debugger 通常不通过 PATH 直接调用
+            });
+        } else {
+            onToolchainFound('msvc', null);
+        }
+    } catch {
+        onToolchainFound('msvc', null);
+    }
 }
 
+// --- 状态更新与回调触发 ---
 
-//---------------------------------------------------------------------以下为核心回调
-// 工具链发现回调处理
-function onToolchainFound(name: 'gnu' | 'clang' | 'msvc', result: any) {
-    // 更新状态
+function onToolchainFound(name: 'gnu' | 'clang' | 'msvc', result: ToolchainDiscoveryResult | null) {
     toolchainState.results[name] = result;
     toolchainState.completed[name] = true;
-    
-    // 检查是否首次完整
-    if (!toolchainState.firstComplete && isToolchainComplete(result)) {
+
+    // 1. 尝试触发“最快可用”回调
+    if (!toolchainState.firstComplete && result && (result.compilers.c || result.compilers.cpp)) {
         toolchainState.firstComplete = {
             toolchain: name,
-            ...result
+            compilers: result.compilers,
+            debugger: result.debugger
         };
-        
-        // 触发首次完整回调
-        toolchainState.callbacks.onFirstComplete.forEach(cb => cb(toolchainState.firstComplete));
+        triggerCallbacks('onFirstComplete', toolchainState.firstComplete);
     }
-    
-    // 检查是否所有完成
+
+    // 2. 检查是否全部完成
     if (toolchainState.completed.gnu && toolchainState.completed.clang && toolchainState.completed.msvc) {
         const best = selectBestToolchain();
         toolchainState.selected = best;
-        
-        // 触发最终完成回调
-        toolchainState.callbacks.onAllComplete.forEach(cb => cb(toolchainState.selected));
+        triggerCallbacks('onAllComplete', best);
     }
 }
 
-// 工具链完整性检查
-function isToolchainComplete(toolchain: any): boolean {
-    return toolchain?.compilers?.['c'] && toolchain?.compilers?.['cpp'] && toolchain?.debugger;
+function triggerCallbacks(type: 'onFirstComplete' | 'onAllComplete', data: ToolchainResult) {
+    const cbs = toolchainState.callbacks[type];
+    // 清空回调队列，避免重复调用
+    if (type === 'onFirstComplete') {
+        toolchainState.callbacks[type] = [];
+    }
+    cbs.forEach(cb => cb(data));
 }
 
-// 最优工具链选择算法
-function selectBestToolchain() {
-    // 优先级：GNU > Clang > MSVC
-    const  order = ['gnu', 'clang', 'msvc'];
-    
-    // 尝试获取第一套完整工具链
+// --- 决策算法 ---
+
+function selectBestToolchain(): ToolchainResult {
+    // 简单策略：优先完整度，其次顺序 GNU > Clang > MSVC
+    const order = ['gnu', 'clang', 'msvc'] as const;
     for (const name of order) {
-        const chain = toolchainState.results[name];
-        if (isToolchainComplete(chain)) {
-            return {
-                toolchain: name,
-                ...chain
-            };
+        const res = toolchainState.results[name];
+        if (res && res.compilers.cpp && res.debugger) {
+            return { toolchain: name, ...res };
         }
     }
-    
-    // 如果无完整工具链，组装第一套完整的组合链
     return createComboToolchain();
 }
 
-// 组合工具链创建器（按优先级组装第一套完整工具链）
-function createComboToolchain() {
-    const parts = {
-        cCompiler: null as any,
-        cppCompiler: null as any,
-        debugger: null as any
-    };
-    
-    // 查找C编译器（优先级：gnu > clang > msvc）
-    if (toolchainState.results.gnu?.compilers?.c) {
-        parts.cCompiler = toolchainState.results.gnu.compilers.c;
-    } else if (toolchainState.results.clang?.compilers?.c) {
-        parts.cCompiler = toolchainState.results.clang.compilers.c;
-    } else if (toolchainState.results.msvc?.compilers?.c) {
-        parts.cCompiler = toolchainState.results.msvc.compilers.c;
+function createComboToolchain(): ToolchainResult {
+    let c, cpp, dbg;
+    const order = ['gnu', 'clang', 'msvc'] as const;
+    for (const name of order) {
+        const res = toolchainState.results[name];
+        if (!res) continue;
+        if (!c && res.compilers.c) c = res.compilers.c;
+        if (!cpp && res.compilers.cpp) cpp = res.compilers.cpp;
+        if (!dbg && res.debugger) dbg = res.debugger;
     }
-    
-    // 查找C++编译器（同优先级顺序）
-    if (toolchainState.results.gnu?.compilers?.cpp) {
-        parts.cppCompiler = toolchainState.results.gnu.compilers.cpp;
-    } // ... 其他类似
-    
-    // 查找调试器（同优先级顺序）
-    if (toolchainState.results.gnu?.debugger) {
-        parts.debugger = toolchainState.results.gnu.debugger;
-    } // ... 其他类似
-    
     return {
         toolchain: 'combo',
-        compilers: {
-            c: parts.cCompiler,
-            cpp: parts.cppCompiler
-        },
-        debugger: parts.debugger
+        compilers: { c, cpp },
+        debugger: dbg
     };
 }
-//--------------------------------------------------------------------以下为回调注册和启动
-// 注册回调函数
-function registerFirstCompletionCallback(callback: (toolchain: any) => void) {
-    toolchainState.callbacks.onFirstComplete.push(callback);
-    
-    // 如果首次完成已发送，立即触发
-    if (toolchainState.firstComplete) {
-        callback(toolchainState.firstComplete);
-    }
+
+// --- 公共 API ---
+
+export function getFastestToolchain(): Promise<ToolchainResult> {
+    return new Promise((resolve) => {
+        // 如果已经有 First Complete 结果，直接返回
+        if (toolchainState.firstComplete) {
+            resolve(toolchainState.firstComplete);
+            return;
+        }
+        // 如果已经全部搜完，直接返回最终结果
+        if (toolchainState.selected) {
+            resolve(toolchainState.selected);
+            return;
+        }
+
+        // 注册回调
+        toolchainState.callbacks.onFirstComplete.push(resolve);
+        
+        // 保底：如果最后都没触发 FirstComplete（比如都没找到），那就等 AllComplete
+        toolchainState.callbacks.onAllComplete.push((res) => {
+             // 只有当 onFirstComplete 还没被触发过时才执行，防止重复 resolve
+             // 但 Promise 状态一旦改变就不会再变，所以这里直接 resolve 也是安全的
+             resolve(res);
+        });
+
+        if (!toolchainState.isSearching) {
+            startToolchainDiscovery();
+        }
+    });
 }
 
-// 注册最终回调
-function registerCompletionCallback(callback: (toolchain: any) => void) {
-    toolchainState.callbacks.onAllComplete.push(callback);
-    
-    // 如果全部已完成，立即触发
-    if (toolchainState.completed.gnu && toolchainState.completed.clang && toolchainState.completed.msvc) {
-        callback(toolchainState.selected);
-    }
-}
-
-// 启动所有查找
 function startToolchainDiscovery() {
-    // 重置状态
-    toolchainState.results.gnu = null;
-    toolchainState.results.clang = null;
-    toolchainState.results.msvc = null;
-    toolchainState.completed.gnu = false;
-    toolchainState.completed.clang = false;
-    toolchainState.completed.msvc = false;
-    toolchainState.firstComplete = null;
-    toolchainState.selected = null;
-    toolchainState.callbacks.onFirstComplete = [];
-    toolchainState.callbacks.onAllComplete = [];
-    
-    // 并行启动所有查找
+    toolchainState.isSearching = true;
+    toolchainState.completed = { gnu: false, clang: false, msvc: false };
     findGnuToolchain();
     findClangToolchain();
     findMsvcToolchain();
