@@ -80,7 +80,7 @@
 3.  Enjoy coding!
 
 ### Contact
-* **Author**: RealSXB
+* **Author**: RealSXB(Nebulazeyv)
 * **Repo**: [https://github.com/realsxb/nobrainercpp](https://github.com/realsxb/nobrainercpp)
 
 ---
