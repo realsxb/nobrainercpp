@@ -1,92 +1,87 @@
-依赖:
-D:\jscode\nobrainercpp>pnpm install
-Lockfile is up to date, resolution step is skipped
-Packages: +236
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- WARN  Tarball download average speed 32 KiB/s (size 99 KiB) is below 50 KiB/s: https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.0.tgz (GET)
-Progress: resolved 236, reused 0, downloaded 236, added 236, done
+# NBCpp - NoBrainerCpp
 
-devDependencies:
-+ @types/mocha 10.0.10
-+ @types/node 22.18.10
-+ @types/vscode 1.105.0
-+ @typescript-eslint/eslint-plugin 8.46.1
-+ @typescript-eslint/parser 8.46.1
-+ @vscode/test-cli 0.0.11
-+ @vscode/test-electron 2.5.2
-+ eslint 9.37.0
-+ typescript 5.9.3
+> **F5 to debug C/C++. No setup, no brain, no problem.**
+>
+> 无需配置，一键调试 C/C++。零依赖，即插即用，裸 VS Code 也能跑。
 
-Done in 5.2s using pnpm v10.28.2
+![logo](smartstart.png)
 
-# nobrainercpp README
+## 🚀 简介 (Introduction)
 
-This is the README for your extension "nobrainercpp". After writing up a brief description, we recommend including the following sections.
+**NBCpp** (NoBrainerCpp) 是一个致力于让 C/C++ 开发变得极其简单的 VS Code 插件。
 
-## Features
+对于很多新手（尤其是 BUAAer 们）来说，配置 VS Code 的 `tasks.json` 和 `launch.json` 简直是噩梦。本插件的初衷就是为了解决这个问题 —— **让你忘记配置，专注于写代码**。
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### ✨ 核心特性
 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+* **零配置 (Zero Config)**: 只要安装插件，打开 C/C++ 文件，点击运行即可。
+* **零依赖 (Zero Dependency)**: 插件内置了微型 LLVM 工具链 (Clang + LLDB)。即使你的电脑没有安装 MinGW 或 Visual Studio，也能直接编译调试！
+* **智能降级 (Smart Fallback)**:
+    1.  优先搜索系统中已安装的 GCC/Clang/MSVC。
+    2.  如果找不到，自动无缝切换到内置的微型工具链。
+* **自动生成 (Auto Gen)**: 自动生成标准的 VS Code 配置文件，方便你后续学习和修改。
 
 ---
 
-## Following extension guidelines
+## 📖 用法 (Usage)
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### 1. 极速模式 (推荐)
+打开任意 `.c` 或 `.cpp` 文件，点击编辑器右上角的 **Smart Run** 图标（或者按 `F5`）。
+插件会自动检测环境、生成配置并启动调试。
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+### 2. 手动模式
+你也可以使用快捷键强制启动特定语言的调试：
+* **Debug C**: `Ctrl + Alt + C`
+* **Debug C++**: `Ctrl + Alt + D`
 
-## Working with Markdown
+---
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+## 🛠️ 关于工具链 (About Toolchain)
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+本插件采用了独特的 **"双保险"** 策略：
 
-## For more information
+1.  **System Toolchain (优先)**:
+    插件会尝试扫描你 PATH 环境变量中的 GCC (MinGW), Clang (LLVM) 或 MSVC。如果找到了，优先使用它们，以获得最佳的系统兼容性。
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+2.  **Embedded Toolchain (兜底)**:
+    如果你的系统极其纯净（什么都没装），插件会激活内置的 **Micro-LLVM** 环境。
+    * 体积仅约 30MB（压缩后）。
+    * 包含 `clang`, `clang++`, `lld`, `lldb-dap`。
+    * 完全独立，不污染系统环境变量。
 
-**Enjoy!**
+*每次启动调试时，右下角都会弹出提示，告诉你当前使用的是哪套工具链。*
+
+---
+
+## 🤝 反馈与贡献 (Feedback)
+
+如果你在使用过程中遇到任何问题，或者有好的建议，欢迎联系我！
+
+* **GitHub Issues**: [https://github.com/realsxb/nobrainercpp/issues](https://github.com/realsxb/nobrainercpp/issues)
+* **Email**: `shaozeyv@foxmail.com` 或 `23182625@buaa.edu.cn`
+
+**如果你觉得这个插件好用，请在 GitHub 上给个 Star ⭐️，这对我很重要！**
+
+---
+
+## 🇬🇧 English Readme
+
+### What is NBCpp?
+**NBCpp** is a VS Code extension designed to make C/C++ development effortlessly simple. It allows you to compile and debug C/C++ code immediately after installation, without any manual configuration.
+
+### Key Features
+* **Out-of-the-Box**: Just click run. No need to write `tasks.json` or `launch.json`.
+* **Embedded Toolchain**: Comes with a built-in micro LLVM toolchain. Works even on a fresh Windows installation without MinGW/VS.
+* **Smart Detection**: Automatically detects system compilers (GCC/Clang/MSVC) and falls back to the embedded one if none are found.
+
+### How to use
+1.  Open a `.c` or `.cpp` file.
+2.  Click the **Smart Run** button in the top-right corner.
+3.  Enjoy coding!
+
+### Contact
+* **Author**: RealSXB
+* **Repo**: [https://github.com/realsxb/nobrainercpp](https://github.com/realsxb/nobrainercpp)
+
+---
+_Generated by NoBrainerCpp | Make C++ Simple Again!_
