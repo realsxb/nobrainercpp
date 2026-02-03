@@ -115,12 +115,16 @@ function generateTasksConfig(toolchain: ToolchainResult, extensionPath: string):
 
 // --- 生成 Launch 配置 (适配自定义调试器) ---
 
-function generateLaunchConfig(toolchain: ToolchainResult): string {
+function generateLaunchConfig(toolchain: ToolchainResult, hasMsExtension: boolean): string {
     const isEmbedded = toolchain.toolchain === 'embedded';
     
     // 如果是 embedded，使用你注册的 "my-simple-lldb"
     // 如果是 system，使用标准的 "cppdbg"
-    const debugType = isEmbedded ? "my-simple-lldb" : "cppdbg";
+    // 核心逻辑修正：
+    // 只有当不是内嵌模式，且检测到了微软插件时，才使用 cppdbg
+    // 否则（包括“有本地GCC但没微软插件”的情况），统统回退到你的内嵌调试器
+    const useCppDbg = !isEmbedded && hasMsExtension;
+    const debugType = useCppDbg ? "cppdbg" : "my-simple-lldb";
     
     // 构造配置对象
     const createConfig = (name: string, preLaunchTask: string) => {
@@ -134,21 +138,39 @@ function generateLaunchConfig(toolchain: ToolchainResult): string {
             preLaunchTask: preLaunchTask
         };
 
-        if (isEmbedded) {
+        if (!useCppDbg) {
             // --- 内嵌调试器配置 ---
             // my-simple-lldb 特有属性
-            config.logFile = "${workspaceFolder}/dap-log.txt";
+            // config.logFile = "${workspaceFolder}/dap-log.txt";
+            config.runInTerminal = true;
             // 注意：my-simple-lldb 不需要 miDebuggerPath，因为它直接调用 lldb-dap
             // 也不需要 MIMode
         } else {
             // --- 系统调试器配置 (GDB/LLDB) ---
+            
+            // 1. 获取调试器路径
+            const dbgPath = toolchain.debugger || "gdb";
+            
+            // 2. 智能判断 MIMode
+            // 如果路径里包含 "lldb" (不论大小写)，就用 lldb 模式，否则默认 gdb
+            const isLLDB = dbgPath.toLowerCase().includes("lldb");
+            
+            config.MIMode = isLLDB ? "lldb" : "gdb";
+            config.miDebuggerPath = dbgPath;
+
             config.args = [];
             config.environment = [];
             config.externalConsole = false;
-            config.MIMode = "gdb"; // 默认为 gdb, 如果是 clang 系统工具链可能是 lldb，这里简化处理
-            config.miDebuggerPath = toolchain.debugger || "gdb";
+            
+            // 3. setupCommands 处理
+            // GDB 通常需要 pretty-printing，LLDB 一般默认支持较好，但加上也不坏
+            // 注意：某些旧版 LLDB 可能不支持 -enable-pretty-printing，所以 ignoreFailures: true 很重要
             config.setupCommands = [
-                { description: "Enable pretty-printing", text: "-enable-pretty-printing", ignoreFailures: true }
+                { 
+                    description: "Enable pretty-printing", 
+                    text: "-enable-pretty-printing", 
+                    ignoreFailures: true 
+                }
             ];
         }
         return config;
@@ -285,9 +307,29 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
         return;
     }
 
-    const toolchainName = toolchain.toolchain === 'embedded' ? "内置工具链" : toolchain.toolchain;
-    vscode.window.showInformationMessage(`NoBrainerCpp: 自动配置完成 (${toolchainName})`);
 
+
+    // ================== 新增：检测微软扩展 ==================
+    const msExtension = vscode.extensions.getExtension('ms-vscode.cpptools');
+    const hasMsExtension = !!msExtension;
+
+    // 提示逻辑优化
+    const toolchainName = toolchain.toolchain === 'embedded' ? "内置工具链" : toolchain.toolchain;
+    
+    if (toolchain.toolchain !== 'embedded' && !hasMsExtension) {
+        // 情况：有 GCC 但没微软插件
+        vscode.window.showWarningMessage(
+            `检测到本地编译器 (${toolchainName})，但未检测到微软 C/C++ 扩展。将使用 NBCpp 内置调试器进行调试。`,
+            "推荐安装微软扩展"
+        ).then(selection => {
+            if (selection === "推荐安装微软扩展") {
+                vscode.commands.executeCommand('extension.open', 'ms-vscode.cpptools');
+            }
+        });
+    } else {
+        vscode.window.showInformationMessage(`NoBrainerCpp: 自动配置完成 (${toolchainName})`);
+    }
+    // =======================================================
     // 3. 写入配置文件
     const vscodeDir = ensureVscodeDir(workspaceFolders[0]);
     
@@ -296,7 +338,7 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
     fs.writeFileSync(tasksPath, generateTasksConfig(toolchain, context.extensionPath));
 
     const launchPath = path.join(vscodeDir, 'launch.json');
-    fs.writeFileSync(launchPath, generateLaunchConfig(toolchain));
+    fs.writeFileSync(launchPath, generateLaunchConfig(toolchain, hasMsExtension));
 
     // ================== 新增：写入 c_cpp_properties.json ==================
     const propertiesPath = path.join(vscodeDir, 'c_cpp_properties.json');

@@ -3,7 +3,7 @@
   "displayName": "NBCpp",
   "description": "无需配置一键调试运行vscode的c/cpp文件,裸vscode依然可用,Zero Config C/C++ ,Out-of-the-box C/C++ environment with embedded LLVM. No setup, no brain, no problem. | Author: RealSXB(Nebulazeyv)",
   "version": "1.0.0",
-  "publisher": "RealSXB(Nebulazeyv)",
+  "publisher": "Nebulazeyv-RealSXB",
   "icon": "smartstart.png",
   "author": {
     "name": "RealSXB(Nebulazeyv)",
@@ -19,7 +19,7 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Programming Languages",
@@ -31,7 +31,7 @@
     "onLanguage:cpp"
   ],
   "extensionDependencies": [
-    "ms-vscode.cpptools"
+
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -72,6 +72,11 @@
                 "type": "string",
                 "description": "程序的工作目录。",
                 "default": "${workspaceFolder}"
+              },
+              "runInTerminal": {
+                "type": "boolean",
+                "description": "是否在vscode内部输出",
+                "default": true
               },
               "stopAtEntry": {
                 "type": "boolean",
