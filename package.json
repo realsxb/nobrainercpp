@@ -2,7 +2,7 @@
   "name": "nobrainercpp",
   "displayName": "NBCpp",
   "description": "无需配置一键调试运行vscode的c/cpp文件,裸vscode依然可用,Zero Config C/C++ ,Out-of-the-box C/C++ environment with embedded LLVM. No setup, no brain, no problem. | Author: RealSXB(Nebulazeyv)",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "publisher": "Nebulazeyv-RealSXB",
   "icon": "smartstart.png",
   "author": {
