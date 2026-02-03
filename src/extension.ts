@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+// --- 在文件最顶部添加这一行 ---
+import * as cp from 'child_process';
+
 // 引入 setExtensionPath
 import { getFastestToolchain, ToolchainResult, setExtensionPath } from './toolchainFinder'; 
 
@@ -117,63 +120,52 @@ function generateTasksConfig(toolchain: ToolchainResult, extensionPath: string):
 
 function generateLaunchConfig(toolchain: ToolchainResult, hasMsExtension: boolean): string {
     const isEmbedded = toolchain.toolchain === 'embedded';
-    
-    // 如果是 embedded，使用你注册的 "my-simple-lldb"
-    // 如果是 system，使用标准的 "cppdbg"
-    // 核心逻辑修正：
-    // 只有当不是内嵌模式，且检测到了微软插件时，才使用 cppdbg
-    // 否则（包括“有本地GCC但没微软插件”的情况），统统回退到你的内嵌调试器
     const useCppDbg = !isEmbedded && hasMsExtension;
-    const debugType = useCppDbg ? "cppdbg" : "my-simple-lldb";
     
-    // 构造配置对象
-    const createConfig = (name: string, preLaunchTask: string) => {
-        const config: any = {
-            name: name,
-            type: debugType,
-            request: "launch",
-            program: "${fileDirname}/${fileBasenameNoExtension}.exe",
-            cwd: "${workspaceFolder}",
-            stopAtEntry: false, // 标准配置通常是 false，根据你的 my-simple-lldb 也可以设为 true
-            preLaunchTask: preLaunchTask
-        };
+    // 如果是用微软插件，用 cppdbg；如果是内嵌，用我们自定义的 type
+    const debugType = useCppDbg ? "cppdbg" : "my-simple-lldb";
 
-        if (!useCppDbg) {
-            // --- 内嵌调试器配置 ---
-            // my-simple-lldb 特有属性
-            // config.logFile = "${workspaceFolder}/dap-log.txt";
-            config.runInTerminal = true;
-            // 注意：my-simple-lldb 不需要 miDebuggerPath，因为它直接调用 lldb-dap
-            // 也不需要 MIMode
-        } else {
-            // --- 系统调试器配置 (GDB/LLDB) ---
-            
-            // 1. 获取调试器路径
+    const createConfig = (name: string, preLaunchTask: string) => {
+        // --- 1. 微软插件 (System) 的配置 ---
+        // 保持原样，完全不动它
+        if (useCppDbg) {
             const dbgPath = toolchain.debugger || "gdb";
-            
-            // 2. 智能判断 MIMode
-            // 如果路径里包含 "lldb" (不论大小写)，就用 lldb 模式，否则默认 gdb
             const isLLDB = dbgPath.toLowerCase().includes("lldb");
             
-            config.MIMode = isLLDB ? "lldb" : "gdb";
-            config.miDebuggerPath = dbgPath;
-
-            config.args = [];
-            config.environment = [];
-            config.externalConsole = false;
-            
-            // 3. setupCommands 处理
-            // GDB 通常需要 pretty-printing，LLDB 一般默认支持较好，但加上也不坏
-            // 注意：某些旧版 LLDB 可能不支持 -enable-pretty-printing，所以 ignoreFailures: true 很重要
-            config.setupCommands = [
-                { 
-                    description: "Enable pretty-printing", 
-                    text: "-enable-pretty-printing", 
-                    ignoreFailures: true 
-                }
-            ];
+            return {
+                name: name,
+                type: "cppdbg",
+                request: "launch",
+                program: "${fileDirname}/${fileBasenameNoExtension}.exe",
+                cwd: "${workspaceFolder}",
+                stopAtEntry: false,
+                preLaunchTask: preLaunchTask, // 让 VS Code 处理编译
+                MIMode: isLLDB ? "lldb" : "gdb",
+                miDebuggerPath: dbgPath,
+                setupCommands: [
+                    { 
+                        description: "Enable pretty-printing", 
+                        text: "-enable-pretty-printing", 
+                        ignoreFailures: true 
+                    }
+                ]
+            };
+        } 
+        
+        // --- 2. 内嵌调试器 (Embedded/Wrapper) 的配置 ---
+        // 我们生成一个“占位符”配置。
+        // 用户按 F5 时，VS Code 会读取这个配置，然后被我们在 extension.ts 里拦截
+        else {
+            return {
+                name: name,
+                type: "my-simple-lldb", // 关键：这会触发我们注册的 Provider
+                request: "launch",
+                // 这里的 program 和 preLaunchTask 主要用于 UI 显示
+                // 实际逻辑我们会接管
+                program: "${fileDirname}/${fileBasenameNoExtension}.exe",
+                preLaunchTask: preLaunchTask 
+            };
         }
-        return config;
     };
 
     const configs = [
@@ -182,6 +174,68 @@ function generateLaunchConfig(toolchain: ToolchainResult, hasMsExtension: boolea
     ];
 
     return getBrandHeader() + JSON.stringify({ version: "0.2.0", configurations: configs }, null, 4);
+}
+// 生成拦截配置
+// src/extension.ts 中的辅助函数
+
+async function startDebuggingWithWrapper(targetExe: string, targetCwd: string, extensionPath: string) {
+// 直接使用传入的路径，稳准狠，F5调试也不会错
+    const wrapperPath = path.join(extensionPath, 'launcher.exe'); 
+    
+    console.log("正在尝试启动 Wrapper:", wrapperPath); // 方便你调试看路径对不对
+    return new Promise<void>((resolve, reject) => {
+        const p = cp.spawn(wrapperPath, [targetExe], { cwd: targetCwd });
+        
+        let started = false;
+
+        p.stdout.on('data', async (chunk) => {
+            const str = chunk.toString();
+            // 解析 Wrapper 输出的 PID，例如 "@@PID:1234@@"
+            const match = str.match(/@@PID:(\d+)@@/);
+            
+            if (match && !started) {
+                started = true;
+                const pid = parseInt(match[1]);
+
+                // 构造一个新的 Attach 配置
+                const attachConfig: vscode.DebugConfiguration = {
+                    name: "Nobrainer Attach",
+                    type: "my-simple-lldb", // 这里注意：必须是你 package.json 里定义的那个调试器类型
+                    request: "attach",
+                    pid: pid,
+                    // 【修改 1】关闭默认的入口暂停，防止停在 ntdll 汇编里
+                    stopOnEntry: false, 
+
+                    // 2. 【关键修改】不要用 initCommands，改用 preRunCommands
+                    // 这些命令会在 Attach 成功后、程序恢复运行前执行
+                    postRunCommands: [
+                        // 此时 Target 已经创建了，断点能直接打上
+                        "breakpoint set --name main", 
+                        
+                        // 此时进程已连接，continue 命令有效
+                        // 这会让程序从 Suspended 状态恢复，直到撞上 main 断点
+
+                    ]
+                };
+
+                // 发起真正的调试会话
+                // parentSession 设置为 undefined，表示这是一个新的独立会话
+                const success = await vscode.debug.startDebugging(undefined, attachConfig);
+                if (success) {
+                    resolve();
+                } else {
+                    reject(new Error("Attach failed"));
+                }
+            }
+        });
+
+        p.on('error', (err) => reject(err));
+        
+        // 如果 Wrapper 意外退出
+        p.on('close', (code) => {
+            if (!started) {reject(new Error(`Launcher exited with code ${code}`));}
+        });
+    });
 }
 // --- 生成 c_cpp_properties.json 配置 (解决报红问题) ---
 
@@ -247,10 +301,12 @@ function getBrandHeader(): string {
         " * ------------------------------------------------------------------",
         " * Generated by NoBrainerCpp",
         " * Author: RealSXB(Nebulazeyv)",
-        " * Github: https://github.com/realsxb/nobrainercpp",
-        " * Slogan: Make C++ Simple Again!",
+        " * Github开源地址: https://github.com/realsxb/nobrainercpp",
+        " * 问题反馈邮箱shaozeyv@foxmail.com,23182625@buaa.edu.cn欢迎沟通",
         " * 作者受够了自己配置vscode的c/cpp环境",
         " * 决心写一个插件一键生成配置文件实现一劳永逸",
+        " * 本插件优先搜索PATH路径中已安装的工具链,如果缺失会使用内嵌工具链",
+        " * 完全0依赖,即插即用,你甚至可以在裸vscode上使用此插件来编译c/cpp!",
         " * 希望能帮到尽可能多的BUAAer!",
         " * ------------------------------------------------------------------",
         " */",
@@ -266,23 +322,18 @@ function showWelcomeMessage() {
  |_| \\_|\\___/|____/|_|  \\__,_|_|_| |_|\\___|_|    
                                           
     
-    >>> NoBrainerCpp v1.0.0 by RealSXB(Nebulazeyv) <<<
+    >>> NoBrainerCpp v1.1.0 by RealSXB(Nebulazeyv) <<<
     >>> 用法->
-    >>> 只需点击右上角左箭头即可开始调试c/cpp无需任何手动配置
-    >>> 完全0依赖,即插即用,你甚至可以在裸vscode上使用此插件来编译c/cpp
-    >>> 说明->
-    >>> 本插件优先搜索PATH路径中已安装的工具链,如果缺失会使用内嵌工具链
-    >>> 每次启动右下角都会有所配置的工具链的相关提示
-    >>> 反馈->
-    >>> Github开源代码地址: https://github.com/realsxb/nobrainercpp <<<
-    >>> 问题反馈邮箱shaozeyv@foxmail.com,23182625@buaa.edu.cn <<<
+    >>> 只需点击右上角左箭头「<-」即可开始调试c/cpp无需任何手动配置
+    >>> 内嵌调试器使用方法：请按调试工具栏上的 绿色三角 ▶ (继续/F5) 按钮来进行断点间跳跃，
+    >>> 内嵌调试器注意：在第一个断点前或最后一个断点后按「步过」会进入汇编文件，继续按 绿色三角 ▶ (继续/F5) 可跳出
     `;
     
     // 创建一个输出通道
     const outputChannel = vscode.window.createOutputChannel("NoBrainerCpp");
     outputChannel.show(true); // true 表示不抢占焦点，但在后台显示
     outputChannel.appendLine(logo);
-    outputChannel.appendLine("正在配置 C/C++ 环境...");
+    outputChannel.appendLine("配置 C/C++ 环境完毕");
 }
 // --- 核心逻辑 ---
 
@@ -397,6 +448,65 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(autoDebug, debugC, debugCpp);
+    // 注册调试配置提供者，专门监听 "my-simple-lldb"
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('my-simple-lldb', {
+        resolveDebugConfiguration: async (folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken) => {
+            
+            // 1. 如果配置里没有 program，或者只是为了生成 launch.json，直接返回
+            if (!config.program) {
+                return config;
+            }
+
+            // 2. 解析变量 (如 ${fileDirname})
+            // 因为 resolveDebugConfiguration 拿到的可能是原始字符串，我们需要手动处理一下路径
+            // 或者更简单的方法：直接获取当前编辑器文件
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {return undefined;}
+
+            const currentFile = editor.document.uri.fsPath;
+            const targetDir = path.dirname(currentFile);
+            const fileNameNoExt = path.basename(currentFile, path.extname(currentFile));
+            const targetExe = path.join(targetDir, fileNameNoExt + ".exe");
+            
+            // 3. 执行编译任务 (因为我们接管了启动，preLaunchTask 可能不会自动触发，或者触发了我们也可以再确保一次)
+            // 建议：手动触发编译任务
+            // 为了简单，这里假设 preLaunchTask 已经在 launch.json 里定义并由 VSCode 在调用此函数前触发了
+            // 如果 VSCode 的 preLaunchTask 机制在 resolveDebugConfiguration 之前执行，那就不用管。
+            // 实际上：preLaunchTask 会在 resolveDebugConfiguration 返回配置*之后*执行。
+            // 但我们要完全替换启动逻辑，所以这里必须返回 undefined 来阻止原生的启动，
+            // 这意味着 preLaunchTask 可能失效。
+            
+            // === 核心黑科技流程 ===
+            
+            // A. 手动执行编译 (找到对应的 Task)
+            const tasks = await vscode.tasks.fetchTasks();
+            const buildTask = tasks.find(t => t.name === config.preLaunchTask);
+            if (buildTask) {
+               const execution = await vscode.tasks.executeTask(buildTask);
+               // 等待编译完成（需要监听 vscode.tasks.onDidEndTaskProcess）
+               await new Promise<void>(resolve => {
+                   const disposable = vscode.tasks.onDidEndTaskProcess(e => {
+                       if (e.execution === execution) {
+                           disposable.dispose();
+                           resolve();
+                       }
+                   });
+               });
+            }
+
+            // B. 启动 Wrapper 并获取 PID
+            try {
+                await startDebuggingWithWrapper(targetExe, targetDir, context.extensionPath);
+            } catch (e: any) {
+                vscode.window.showErrorMessage("启动调试失败: " + e.message);
+            }
+
+            // 4. 返回 undefined !!!
+            // 这告诉 VS Code："原本的 launch 请求我已经处理完了（或者取消了），你不要再启动任何适配器了。"
+            // 因为 startDebuggingWithWrapper 内部会发起一个新的 "attach" 请求。
+            return undefined;
+        }
+    }));
 }
 
 export function deactivate() {}
