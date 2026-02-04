@@ -410,7 +410,19 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
         vscode.window.showErrorMessage("启动调试失败: " + e);
     }
 }
-
+// --- 辅助函数：强制杀死指定名称的进程 ---
+async function killProcessByName(exeName: string): Promise<void> {
+    return new Promise((resolve) => {
+        // 使用 Windows 的 taskkill 命令
+        // /F = 强制终止
+        // /IM = 镜像名称 (Image Name)
+        // 2>nul = 忽略错误输出（比如进程本来就没运行的时候，不需要报错）
+        cp.exec(`taskkill /F /IM "${exeName}" 2>nul`, (err) => {
+            // 无论成功还是失败（比如进程不存在），都视为完成，继续往下走
+            resolve();
+        });
+    });
+}
 // --- 插件入口 ---
 
 export function activate(context: vscode.ExtensionContext) {
@@ -476,7 +488,16 @@ export function activate(context: vscode.ExtensionContext) {
             // 这意味着 preLaunchTask 可能失效。
             
             // === 核心黑科技流程 ===
-            
+            // ============================================================
+            // 【修复开始】: 在编译前，先把旧的进程杀掉，解锁文件
+            // ============================================================
+            const exeName = fileNameNoExt + ".exe";
+            // 提示用户（可选，为了体验可以不弹窗，直接后台杀）
+            // console.log(`Cleaning up process: ${exeName}`);
+            await killProcessByName(exeName);
+            // ============================================================
+            // 【修复结束】
+            // ============================================================
             // A. 手动执行编译 (找到对应的 Task)
             const tasks = await vscode.tasks.fetchTasks();
             const buildTask = tasks.find(t => t.name === config.preLaunchTask);
