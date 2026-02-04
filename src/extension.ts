@@ -214,7 +214,6 @@ async function startDebuggingWithWrapper(targetExe: string, targetCwd: string, e
                         
                         // 此时进程已连接，continue 命令有效
                         // 这会让程序从 Suspended 状态恢复，直到撞上 main 断点
-
                     ]
                 };
 
@@ -291,7 +290,7 @@ function generatePropertiesConfig(toolchain: ToolchainResult, extensionPath: str
         version: 4
     };
 
-    return getBrandHeader() + JSON.stringify(config, null, 4);
+    return JSON.stringify(config, null, 4);
 }
 // src/extension.ts
 
@@ -322,7 +321,7 @@ function showWelcomeMessage() {
  |_| \\_|\\___/|____/|_|  \\__,_|_|_| |_|\\___|_|    
                                           
     
-    >>> NoBrainerCpp v1.1.2 by RealSXB(Nebulazeyv) <<<
+    >>> NoBrainerCpp v1.2.0 by RealSXB(Nebulazeyv) <<<
     >>> 用法->
     >>> 只需点击右上角左箭头「<-」即可开始调试c/cpp无需任何手动配置
     >>> 内嵌调试器使用方法：请按调试工具栏上的 绿色三角 ▶ (继续/F5) 按钮来进行断点间跳跃，
@@ -370,7 +369,7 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
     if (toolchain.toolchain !== 'embedded' && !hasMsExtension) {
         // 情况：有 GCC 但没微软插件
         vscode.window.showWarningMessage(
-            `检测到本地编译器 (${toolchainName})，但未检测到微软 C/C++ 扩展。将使用 NBCpp 内置调试器进行调试（按 左侧第一个▶ (F5) 跳至第一个断点）。`,
+            `检测到本地编译器 (${toolchainName})，但未检测到微软 C/C++ 扩展。将使用 NBCpp 内置调试器进行调试。`,
             "推荐安装微软扩展"
         ).then(selection => {
             if (selection === "推荐安装微软扩展") {
@@ -400,7 +399,7 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
     // ====================================================================
 
     // 解决竞态条件
-    await sleep(200); 
+    // await sleep(200); 
     try { await vscode.tasks.fetchTasks(); } catch (e) {}
 
     // 4. 启动调试
@@ -507,6 +506,43 @@ export function activate(context: vscode.ExtensionContext) {
             return undefined;
         }
     }));
+    // 注册一个调试适配器追踪器
+    // 专门用来解决 Attach 后需要手动 F5 的问题
+    vscode.debug.registerDebugAdapterTrackerFactory('my-simple-lldb', {
+        createDebugAdapterTracker(session: vscode.DebugSession) {
+            return {
+                onDidSendMessage: (message) => {
+                    // 我们只关心 "Nobrainer Attach" 这个特定的调试会话
+                    if (session.configuration.name !== "Nobrainer Attach") {
+                        return;
+                    }
+
+                    // 监听调试器发回给 VS Code 的消息 (Event)
+                    if (message.type === 'event' && message.event === 'stopped') {
+                        const reason = message.body.reason;
+                        
+                        // 调试器通常因为 'signal', 'exception' (Windows Attach时), 或 'entry' 而暂停
+                        // 但如果是因为 'breakpoint' (比如已经撞到了 main)，那就不应该自动继续
+                        // 注意：不同 lldb 版本 attach 时的 reason 可能不同，通常是 'signal' 或 'exception'
+                        if (reason !== 'breakpoint' && reason !== 'step') {
+                            console.log(`[Tracker] Detect initial stop (reason: ${reason}), auto-continuing...`);
+                            
+                            // 优雅地发送 Continue 命令
+                            // 这里的 threadId 很重要，告诉调试器恢复哪个线程
+                            const threadId = message.body.threadId;
+                            session.customRequest('continue', { threadId: threadId }).then(() => {
+                                console.log("[Tracker] Auto-continue executed.");
+                            }, (e) => {
+                                console.log("[Tracker] Auto-continue ignored/failed:", e);
+                            });
+                        }
+                    }
+                }
+            };
+        }
+    });
+
+
 }
 
 export function deactivate() {}
