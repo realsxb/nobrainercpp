@@ -370,7 +370,7 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
     if (toolchain.toolchain !== 'embedded' && !hasMsExtension) {
         // 情况：有 GCC 但没微软插件
         vscode.window.showWarningMessage(
-            `检测到本地编译器 (${toolchainName})，但未检测到微软 C/C++ 扩展。将使用 NBCpp 内置调试器进行调试。`,
+            `检测到本地编译器 (${toolchainName})，但未检测到微软 C/C++ 扩展。将使用 NBCpp 内置调试器进行调试（按 左侧第一个▶ (F5) 跳至第一个断点）。`,
             "推荐安装微软扩展"
         ).then(selection => {
             if (selection === "推荐安装微软扩展") {
