@@ -321,7 +321,7 @@ function showWelcomeMessage() {
  |_| \\_|\\___/|____/|_|  \\__,_|_|_| |_|\\___|_|    
                                           
     
-    >>> NoBrainerCpp v1.2.2 by RealSXB(Nebulazeyv) <<<
+    >>> NoBrainerCpp v1.3.0 by RealSXB(Nebulazeyv) <<<
     >>> 用法->
     >>> 只需点击右上角左箭头「<-」即可开始调试c/cpp无需任何手动配置
     >>> 内嵌调试器使用方法：请按调试工具栏上的 绿色三角 ▶ (继续/F5) 按钮来进行断点间跳跃，
@@ -549,13 +549,14 @@ try {
     # 2. 写入 PID
     [System.IO.File]::WriteAllText($PidFile, $pidVal.ToString())
 
-    Write-Host "[PS] Target is suspended. Waiting for debugger..."
-    
+    Write-Host "[PS] Target is suspended. Waiting for debugger."
+    Write-Host "[PS] You can input below..."
     # 3. 等待 (调用新封装的无参方法)
     # 这样 PowerShell 不需要处理 0xFFFFFFFF 这个数字，就不会报错了
     [Launcher]::WaitToExit($hProcess)
-    
-    Write-Host "[PS] Process Exited."
+
+    #隐藏末尾输出，避免误导新手
+    # Write-Host "[PS] Process Exited."
 }
 catch {
     Write-Error "Launch Failed: $($_.Exception.ToString())"
@@ -672,17 +673,21 @@ export function activate(context: vscode.ExtensionContext) {
             const pidFilePath = path.join(os.tmpdir(), `nobrainer_pid_${randomSuffix}.txt`);
             
             outputChannel.clear();
-            outputChannel.show(true); 
+            // 【修改 1】不再主动弹出 Output 面板，只在后台写日志
+            // outputChannel.show(true); 
             outputChannel.appendLine(`[Init] Target: ${targetExe}`);
 
             const extensionPath = context.extensionPath;
             const launcherScript = createPowerShellLauncher(extensionPath);
 
             const oldTerminal = vscode.window.terminals.find(t => t.name === "Nobrainer Run");
-            if (oldTerminal) {oldTerminal.dispose();}
+            if (oldTerminal){ oldTerminal.dispose();}
 
             const terminal = vscode.window.createTerminal("Nobrainer Run");
-            terminal.show(true);
+            
+            // 【修改 2】强势霸屏！不传参数 = 强制获取焦点
+            // 这样你的光标会直接在终端里闪烁，等待输入
+            terminal.show(); 
             
             // 运行脚本
             const command = `powershell -NoProfile -ExecutionPolicy Bypass -File "${launcherScript}" "${targetExe}" "${pidFilePath}"`;
@@ -715,24 +720,21 @@ export function activate(context: vscode.ExtensionContext) {
                 outputChannel.appendLine(`[Success] Got PID: ${pid}`);
 
                 // ============================================================
-                // 【核心修复】构造 Attach 配置
+                // 构造 Attach 配置
                 // ============================================================
                 const attachConfig = {
                     ...config,
                     request: "attach",
                     pid: pid,
-                    
-                    // 必须覆盖 program 为绝对路径
                     program: targetExe,
                     cwd: targetDir,
-
                     preLaunchTask: undefined, 
                     name: "Nobrainer Attach",
-                    
-                    // 设为 true 或 false 都可以，因为我们下面用了 postRunCommands
-                    // 建议 false
                     stopOnEntry: false, 
-
+                    
+                    // 【修改 3】禁止调试控制台抢戏
+                    // 确保调试开始后，焦点依然留在我们的终端里
+                    internalConsoleOptions: "neverOpen",
 
                     env: {
                         ...config.env,
@@ -742,8 +744,16 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // 启动调试
                 await vscode.debug.startDebugging(folder, attachConfig);
+                
+                // 【修改 4】双重保险：调试器启动那一瞬间，再次把焦点拉回终端
+                // 防止 lldb 启动时的某些 UI 刷新动作把焦点抢走
+                setTimeout(() => {
+                    terminal.show();
+                }, 500);
 
             } catch (e: any) {
+                // 只有出错时才弹出日志给用户看
+                outputChannel.show(true);
                 outputChannel.appendLine(`[Error] ${e.message}`);
                 vscode.window.showErrorMessage(e.message);
             }
@@ -753,7 +763,67 @@ export function activate(context: vscode.ExtensionContext) {
     }));
     // 注册一个调试适配器追踪器
 
+// ============================================================
+    // 【终极方案】双向闭锁追踪器 (Double-Latch Tracker)
+    // 完美解决 "stopped" 和 "configurationDone" 乱序到达的问题
+    // ============================================================
+    vscode.debug.registerDebugAdapterTrackerFactory('my-simple-lldb', {
+        createDebugAdapterTracker(session: vscode.DebugSession) {
+            
+            // 状态标志位
+            let configDone = false;       // VS Code 是否配置完毕
+            let stoppedThreadId: number | undefined = undefined; // 记录暂停的线程ID
+            let hasResumed = false;       // 确保只执行一次继续
 
+            // 尝试执行继续操作的函数
+            const tryResume = () => {
+                // 必须同时满足三个条件：
+                // 1. VS Code 配置完了 (configDone)
+                // 2. 调试器已经停了 (stoppedThreadId 有值)
+                // 3. 我们还没自动继续过 (!hasResumed)
+                if (configDone && stoppedThreadId !== undefined && !hasResumed) {
+                    hasResumed = true;
+                    // 稍微延迟 10ms 确保状态稳定
+                    setTimeout(() => {
+                        console.log(`[Tracker] Conditions met. Auto-continuing thread ${stoppedThreadId}...`);
+                        session.customRequest('continue', { 
+                            threadId: stoppedThreadId 
+                        });
+                    }, 10);
+                }
+            };
+
+            return {
+                // 1. 监听调试器发来的消息 (Adapter -> VS Code)
+                onDidSendMessage: (message) => {
+                    if (session.configuration.name !== "Nobrainer Attach") {return;}
+
+                    // 捕获 "stopped" 事件
+                    if (message.type === 'event' && message.event === 'stopped') {
+                        const reason = message.body.reason;
+                        // 记录线程ID，不管是 exception 还是 entry，只要不是用户断点(breakpoint/step)都认
+                        if (reason !== 'breakpoint' && reason !== 'step') {
+                            console.log(`[Tracker] Debugger stopped (reason: ${reason}). Waiting for ConfigDone...`);
+                            stoppedThreadId = message.body.threadId;
+                            tryResume(); // 尝试触发
+                        }
+                    }
+                },
+
+                // 2. 监听 VS Code 发出的消息 (VS Code -> Adapter)
+                onWillReceiveMessage: (message) => {
+                    if (session.configuration.name !== "Nobrainer Attach") {return;}
+
+                    // 捕获 "configurationDone" 请求
+                    if (message.command === 'configurationDone') {
+                        console.log(`[Tracker] VS Code ConfigurationDone. Waiting for Stopped...`);
+                        configDone = true;
+                        tryResume(); // 尝试触发
+                    }
+                }
+            };
+        }
+    });
 
 }
 

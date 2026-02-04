@@ -120,13 +120,14 @@ try {
     # 2. 写入 PID
     [System.IO.File]::WriteAllText($PidFile, $pidVal.ToString())
 
-    Write-Host "[PS] Target is suspended. Waiting for debugger..."
-    
+    Write-Host "[PS] Target is suspended. Waiting for debugger."
+    Write-Host "[PS] You can input below..."
     # 3. 等待 (调用新封装的无参方法)
     # 这样 PowerShell 不需要处理 0xFFFFFFFF 这个数字，就不会报错了
     [Launcher]::WaitToExit($hProcess)
-    
-    Write-Host "[PS] Process Exited."
+
+    #隐藏末尾输出，避免误导新手
+    # Write-Host "[PS] Process Exited."
 }
 catch {
     Write-Error "Launch Failed: $($_.Exception.ToString())"
