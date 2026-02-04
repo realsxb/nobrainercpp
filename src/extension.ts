@@ -321,7 +321,7 @@ function showWelcomeMessage() {
  |_| \\_|\\___/|____/|_|  \\__,_|_|_| |_|\\___|_|    
                                           
     
-    >>> NoBrainerCpp v1.2.0 by RealSXB(Nebulazeyv) <<<
+    >>> NoBrainerCpp v1.2.2 by RealSXB(Nebulazeyv) <<<
     >>> 用法->
     >>> 只需点击右上角左箭头「<-」即可开始调试c/cpp无需任何手动配置
     >>> 内嵌调试器使用方法：请按调试工具栏上的 绿色三角 ▶ (继续/F5) 按钮来进行断点间跳跃，
