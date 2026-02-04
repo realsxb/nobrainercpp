@@ -14,7 +14,7 @@
 
 ### ✨ 核心特性
 
-* **零配置 (Zero Config)**: 只要安装插件，打开 C/C++ 文件，点击运行即可。
+* **零配置 (Zero Config)**: 只要安装插件，打开一个文件夹，选中里面的 C/C++ 文件，点击运行即可。
 * **零依赖 (Zero Dependency)**: 插件内置了微型 LLVM 工具链 (Clang + LLDB)。即使你的电脑没有安装 MinGW 或 Visual Studio，也能直接编译调试！
 * **智能降级 (Smart Fallback)**:
     1.  优先搜索系统中已安装的 GCC/Clang/MSVC。
