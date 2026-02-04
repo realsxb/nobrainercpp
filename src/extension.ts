@@ -411,6 +411,26 @@ async function setupDebugEnvironment(context: vscode.ExtensionContext, isCpp: bo
     }
 }
 
+// --- 辅助函数：清理旧进程 ---
+// 这里的逻辑必须和 launcher.cpp 里的 SetConsoleTitle 对应
+async function killPreviousProcess(targetExePath: string) {
+    const fileName = path.basename(targetExePath);
+    // 这里的标题格式必须和 C++ 代码里的一模一样！
+    const targetTitle = `NBCpp-Debug: ${fileName}`;
+    
+    // 使用 Windows 原生命令 taskkill
+    // /F : 强制结束
+    // /FI : 过滤器，查找标题等于 targetTitle 的窗口
+    // 这样不会误伤其他 cmd 窗口，只会杀掉我们插件产生的旧窗口
+    const command = `taskkill /F /FI "WINDOWTITLE eq ${targetTitle}"`;
+
+    return new Promise<void>((resolve) => {
+        // 执行命令。无论成功失败（比如之前没窗口）都 resolve，不阻塞流程
+        cp.exec(command, (err, stdout, stderr) => {
+            resolve(); 
+        });
+    });
+}
 // --- 插件入口 ---
 
 export function activate(context: vscode.ExtensionContext) {
@@ -474,7 +494,11 @@ export function activate(context: vscode.ExtensionContext) {
             // 实际上：preLaunchTask 会在 resolveDebugConfiguration 返回配置*之后*执行。
             // 但我们要完全替换启动逻辑，所以这里必须返回 undefined 来阻止原生的启动，
             // 这意味着 preLaunchTask 可能失效。
-            
+            // =========================================================
+            // 【新增】在这里插入清理逻辑！
+            // 在编译和启动之前，先把名字叫 "NBCpp-Debug: xxx.exe" 的旧窗口干掉
+            // =========================================================
+            await killPreviousProcess(targetExe);
             // === 核心黑科技流程 ===
             
             // A. 手动执行编译 (找到对应的 Task)
