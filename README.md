@@ -26,7 +26,7 @@
 ## 📖 用法 (Usage)
 
 ### 1. 极速模式 (推荐)
-打开任意 `.c` 或 `.cpp` 文件，点击编辑器右上角的 **Smart Run** 图标（或者按 `F5`）。
+先用vscode打开一个文件夹，再点击任意 `.c` 或 `.cpp` 文件，点击编辑器右上角的 **Smart Run** 图标（或者按 `F5`）。
 插件会自动检测环境、生成配置并启动调试。
 
 ### 2. 手动模式
@@ -75,7 +75,7 @@
 * **Smart Detection**: Automatically detects system compilers (GCC/Clang/MSVC) and falls back to the embedded one if none are found.
 
 ### How to use
-1.  Open a `.c` or `.cpp` file.
+1.  Open a folder and select`.c` or `.cpp` file.
 2.  Click the **Smart Run** button in the top-right corner.
 3.  Enjoy coding!
 
