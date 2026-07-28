@@ -1,5 +1,7 @@
 # NBCpp - NoBrainerCpp
 
+[中文](#-简介-introduction) | [English](#-english-readme)
+
 > **F5 to debug C/C++. No setup, no brain, no problem.**
 >
 > 无需配置，一键调试 C/C++。零依赖，即插即用，裸 VS Code 也能跑。
