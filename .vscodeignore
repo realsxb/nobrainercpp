@@ -24,10 +24,17 @@ v.svg
 # 使用 ! 开头表示“不忽略”（即强制打包）
 # 即使上面的规则不小心匹配到了，这里也会把它们救回来
 
-!out/**
+!out/*.js
 !package.json
 !README.md
 !LICENSE
 !lldbv1.0/**
 !smartstart.svg
 !smartstart.png
+# Development files and retired launchers
+out/test/**
+native/**
+Start-Debug.ps1
+launcher.exe
+node_modules/**
+*.vsix

@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Old NBCpp/lldbv1.0/x86_64-w64-mingw32/include/c++/v1",
+                "C:/Old NBCpp/lldbv1.0/lib/clang/21/include",
+                "C:/Old NBCpp/lldbv1.0/x86_64-w64-mingw32/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "compilerPath": "C:\\Old NBCpp\\lldbv1.0\\bin\\clang++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-clang-x64",
+            "compilerArgs": [
+                "-target",
+                "x86_64-w64-mingw32",
+                "--sysroot",
+                "C:/Old NBCpp/lldbv1.0/x86_64-w64-mingw32",
+                "-stdlib=libc++",
+                "-lunwind",
+                "--rtlib=compiler-rt"
+            ]
+        }
+    ],
+    "version": 4
+}

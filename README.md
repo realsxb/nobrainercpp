@@ -29,7 +29,7 @@
 
 ### 1. 极速模式 (推荐)
 先用vscode打开一个文件夹，再点击任意 `.c` 或 `.cpp` 文件，点击编辑器右上角的 **Smart Run** 图标（或者按 `F5`）。
-插件会自动检测环境、生成配置并启动调试。
+插件会自动检测环境、生成配置并启动调试。Windows x64 上，即使没有安装微软 C/C++ 扩展，也可以在代码行旁设置断点，按 F5 启动，在 VS Code 集成终端中给 `scanf` 或 `std::cin` 输入数据，按 F10 单步执行。已有自定义 `launch.json` 的项目可以通过 **Smart Run** 调试当前文件。
 
 ### 2. 手动模式
 你也可以使用快捷键强制启动特定语言的调试：
@@ -51,7 +51,7 @@
     * 包含 `clang`, `clang++`, `lld`, `lldb-dap`。
     * 完全独立，不污染系统环境变量。
 
-*每次启动调试时，右下角都会弹出提示，告诉你当前使用的是哪套工具链。*
+*Smart Run 会在状态栏显示本次使用的编译器和调试器。*
 
 ---
 
@@ -79,7 +79,7 @@
 ### How to use
 1.  Open a folder and select`.c` or `.cpp` file.
 2.  Click the **Smart Run** button in the top-right corner.
-3.  Enjoy coding!
+3.  Set a breakpoint, use F10 to step over, and enter program input in the integrated terminal. The bundled debugger supports Windows x64, including installations without the Microsoft C/C++ extension.
 
 ### Contact
 * **Author**: RealSXB(Nebulazeyv)
