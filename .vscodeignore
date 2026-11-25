@@ -34,6 +34,7 @@ v.svg
 # Development files and retired launchers
 out/test/**
 native/**
+toolchain/**
 Start-Debug.ps1
 launcher.exe
 node_modules/**

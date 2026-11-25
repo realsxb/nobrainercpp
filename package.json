@@ -1,15 +1,15 @@
 {
   "name": "nobrainercpp",
   "displayName": "NBCpp",
-  "description": "无需配置一键调试运行vscode的c/cpp文件,裸vscode依然可用,Zero Config C/C++ ,Out-of-the-box C/C++ environment with embedded LLVM. No setup, no brain, no problem. | Author: RealSXB(Nebulazeyv)",
-  "version": "1.5.0",
+  "description": "Build and debug C/C++ in VS Code with a compact Windows x64 Clang, LLD and LLDB toolchain. 在 VS Code 中一键编译和调试 C/C++。",
+  "version": "1.5.1",
   "publisher": "Nebulazeyv-RealSXB",
   "icon": "smartstart.png",
   "author": {
     "name": "RealSXB(Nebulazeyv)",
     "url": "https://github.com/realsxb"
   },
-  "homepage": "https://github.com/realsxb/nobrainercpp",
+  "homepage": "https://buaahmjh.com/en/projects/nbcpp",
   "repository": {
     "type": "git",
     "url": "https://github.com/realsxb/nobrainercpp.git"
@@ -82,42 +82,42 @@
             "properties": {
               "nbcppActiveFile": {
                 "type": "boolean",
-                "description": "根据当前源文件选择编译器和调试器。",
+                "description": "%debug.activeFile%",
                 "default": false
               },
               "logFile": {
                 "type": "string",
-                "description": "调试日志文件路径",
+                "description": "%debug.logFile%",
                 "default": "${workspaceFolder}/dap-log.txt"
               },
               "program": {
                 "type": "string",
-                "description": "要调试的可执行文件的绝对路径。",
+                "description": "%debug.program%",
                 "default": "${fileDirname}/${fileBasenameNoExtension}.exe"
               },
               "args": {
                 "type": "array",
-                "description": "传递给程序的命令行参数。",
+                "description": "%debug.args%",
                 "default": []
               },
               "cwd": {
                 "type": "string",
-                "description": "程序的工作目录。",
+                "description": "%debug.cwd%",
                 "default": "${workspaceFolder}"
               },
               "runInTerminal": {
                 "type": "boolean",
-                "description": "是否在vscode内部输出",
+                "description": "%debug.terminal%",
                 "default": true
               },
               "stopAtEntry": {
                 "type": "boolean",
-                "description": "启动后是否自动暂停在入口处。",
+                "description": "%debug.stopAtEntry%",
                 "default": false
               },
               "env": {
                 "type": "object",
-                "description": "环境变量。",
+                "description": "%debug.env%",
                 "default": {}
               }
             }

@@ -1,6 +1,8 @@
 # NBCpp 开发笔记
 
-NBCpp 1.5.0 帮助初学者在 Windows x64 的 VS Code 里调试当前打开的单个 C 或 C++ 文件。扩展宿主运行 TypeScript 编译出的 JavaScript，本机编译器负责生成可执行文件，调试适配器把 VS Code 的断点、单步和变量查看请求交给调试器。修改这三部分时，可以分别验证。
+[English](development-notes.en.md) · [中文项目说明](../README.zh-CN.md) · [使用指南](https://buaahmjh.com/projects/nbcpp) · [源代码仓库](https://github.com/realsxb/nobrainercpp)
+
+NBCpp 帮助初学者在 Windows x64 的桌面版 VS Code 中调试当前打开的单个 C 或 C++ 文件。扩展宿主执行 TypeScript 编译出的 JavaScript，编译器生成 Windows 可执行文件，调试适配器把断点、单步和变量查看请求交给调试器。1.5.0 引入了本文介绍的集成终端启动器。支持的编辑器版本与实测包体积见[中文项目说明](../README.zh-CN.md)。
 
 ## 从源码运行
 
@@ -26,16 +28,27 @@ int main() {
 }
 ```
 
-在输出语句上设置断点，点击右上角的 **Smart Run**，在集成终端输入 `41` 并回车。停在断点时可以查看 `n`，再按 F10，应看到终端输出 `42`。仓库窗口的 F5 启动扩展开发宿主，练习文件夹里的 F5 启动 C++ 调试会话。[扩展开发启动配置](../.vscode/launch.json)
+在输出语句上设置断点，点击右上角的 **Smart Run**，在集成终端输入 `41` 并回车。停在断点时可以查看 `n`，再按 F10，应看到终端输出 `42`。仓库窗口的 F5 启动扩展开发宿主，练习文件夹选用 NBCpp 启动配置时，F5 启动 C++ 调试会话。[扩展开发启动配置](https://github.com/realsxb/nobrainercpp/blob/main/.vscode/launch.json)
+
+### 单文件程序的验证范围
+
+我们用随包的编译器、sysroot 和生成任务相同的参数，在含空格和中文的目录中编译并运行了以下两个单文件。运行时将 PATH 限于内置工具目录和 Windows System32，两个程序都重新读回文件并核对结果。
+
+| 语言 | 实际操作 | 输入与结果 |
+| --- | --- | --- |
+| C | 用 `scanf` 把姓名和三个整数写入结构体，在整数数组上求和，以 `fprintf` 写入文件，再通过 `fscanf` 和 `strcmp` 核对内容。 | 输入 `Alice 3 11 -2`，文件和终端均得到 `Alice 12`。 |
+| C++ | 模板类用 `std::vector<std::string>` 保存 `std::cin` 输入，调用 `std::sort` 排序，以 `std::ofstream` 写入，再以 `std::ifstream` 读回。 | 输入 `cat apple fish`，输出顺序为 `apple cat fish`。 |
+
+默认构建任务只把当前源文件交给编译器。多个源文件需要共同链接时，应在项目的构建配置中列出它们。使用外部 SDK 的程序还需要对应的头文件、库和搜索路径。上面两例验证了所列接口，其他库或语言标准的支持应结合选中的编译器与项目构建参数确认。
 
 ## 启动一次调试时，扩展做了什么
 
-1. **找到当前文件。** Smart Run 识别活动编辑器里的 C 或 C++ 文件，保存修改，找到文件所属的工作区文件夹。扩展把本次编译任务绑定到这份源码、所选语言和编译器路径，多根工作区里的同名文件可以分别调试。[扩展入口](../src/extension.ts)
-2. **先找到可用组合，再为下一次择优。** GNU、Clang、MSVC 三组探测并发读取 PATH。以 C++ 为例，先返回的结果中已有 C++ 编译器和调试器，就可以启动本次构建。全部探测完成后，完整工具链按 GNU、Clang、MSVC 的顺序择优，缺项时按语言组合现有工具。系统里只有 C 编译器时，C++ 仍可选用内置 Clang++。MSVC 还需要已初始化的头文件和库环境。发现缓存中的程序已移走时，下一次运行会重新探测。[工具链选择代码](../src/toolchainFinder.ts)
-3. **按工具生成任务。** 编译器以独立进程启动，文件名和参数分别传递。扩展生成构建任务、启动配置和 IntelliSense 配置，并识别用户改过的文件。配置生成器根据工具选择调试路径。有微软 C/C++ 扩展且能匹配 GDB 时使用 `cppdbg`，匹配 MSVC 时使用 `cppvsdbg`，其余支持的 Windows 配置可使用内置的 LLDB DAP。[配置生成器](../src/configuration.ts) · [工作区文件写入与迁移](../src/projectFiles.ts)
-4. **把程序输入留在 VS Code 终端。** 使用内置 LLDB 时，构建成功后，扩展以进程任务启动约 40 KB 的终端启动器。启动器在集成终端中创建挂起的目标，通过会话独有的命名管道通知扩展 PID。LLDB 附加到这个 PID，配置好断点后再恢复目标线程，因此短程序能在首个用户断点停住，`scanf` 和 `std::cin` 也能读取输入。重新启动时，新适配器获取新 PID。关闭会话时，Windows Job Object 帮助释放这次调试所创建的进程。[VS Code 端实现](../src/terminalDebugger.ts) · [原生启动器源码](../native/terminal-launcher.c)
+1. **找到当前文件。** Smart Run 识别活动编辑器里的 C 或 C++ 文件，保存修改，找到文件所属的工作区文件夹。扩展把本次编译任务绑定到这份源码、所选语言和编译器路径，多根工作区里的同名文件可以分别调试。[扩展入口](https://github.com/realsxb/nobrainercpp/blob/main/src/extension.ts)
+2. **先找到可用组合，再为下一次择优。** GNU、Clang、MSVC 三组探测并发读取 PATH。以 C++ 为例，先返回的结果中已有 C++ 编译器和调试器，就可以启动本次构建。全部探测完成后，完整工具链按 GNU、Clang、MSVC 的顺序择优，缺项时按语言组合现有工具。系统里只有 C 编译器时，C++ 仍可选用内置 Clang++。MSVC 还需要已初始化的头文件和库环境。发现缓存中的程序已移走时，下一次运行会重新探测。[工具链选择代码](https://github.com/realsxb/nobrainercpp/blob/main/src/toolchainFinder.ts)
+3. **按工具生成任务。** 编译器以独立进程启动，文件名和参数分别传递。扩展生成构建任务、启动配置和 IntelliSense 配置，并识别用户改过的文件。配置生成器根据工具选择调试路径。有微软 C/C++ 扩展且能匹配 GDB 时使用 `cppdbg`，匹配 MSVC 时使用 `cppvsdbg`，其余支持的 Windows 配置可使用内置的 LLDB DAP。[配置生成器](https://github.com/realsxb/nobrainercpp/blob/main/src/configuration.ts) · [工作区文件写入与迁移](https://github.com/realsxb/nobrainercpp/blob/main/src/projectFiles.ts)
+4. **把程序输入留在 VS Code 终端。** 使用内置 LLDB 时，构建成功后，扩展以进程任务启动约 40 KB 的终端启动器。启动器在集成终端中创建挂起的目标，通过会话独有的命名管道通知扩展 PID。LLDB 附加到这个 PID，配置好断点后再恢复目标线程，因此短程序能在首个用户断点停住，`scanf` 和 `std::cin` 也能读取输入。重新启动时，新适配器获取新 PID。关闭会话时，Windows Job Object 帮助释放这次调试所创建的进程。[VS Code 端实现](https://github.com/realsxb/nobrainercpp/blob/main/src/terminalDebugger.ts) · [原生启动器源码](https://github.com/realsxb/nobrainercpp/blob/main/native/terminal-launcher.c)
 
-早期版本先用 `launcher.exe` 创建独立控制台，并将挂起进程的 PID 写到标准输出。1.4.1 的路径改为通过 PowerShell 编译 C# 启动代码，并轮询临时 PID 文件。1.5.0 使用上面的集成终端进程任务和命名管道。保留这段历史也解释了为何随包使用自己的启动器：内置 LLDB 21.1.8 的 Windows 版本尚未实现原生 `runInTerminal` 所需的 FIFO。[早期 C++ 启动器](../native/legacy/launcher.cpp) · [早期 PowerShell 脚本](../Start-Debug.ps1) · [LLVM 21.1.8 对应源码](https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/lldb/tools/lldb-dap/FifoFiles.cpp)
+早期版本先用 `launcher.exe` 创建独立控制台，并将挂起进程的 PID 写到标准输出。1.4.1 的路径改为通过 PowerShell 编译 C# 启动代码，并轮询临时 PID 文件。1.5.0 使用上面的集成终端进程任务和命名管道。保留这段历史也解释了为何随包使用自己的启动器：内置 LLDB 21.1.8 的 Windows 版本尚未实现原生 `runInTerminal` 所需的 FIFO。[早期 C++ 启动器](https://github.com/realsxb/nobrainercpp/blob/main/native/legacy/launcher.cpp) · [早期 PowerShell 脚本](https://github.com/realsxb/nobrainercpp/blob/main/Start-Debug.ps1) · [LLVM 21.1.8 对应源码](https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/lldb/tools/lldb-dap/FifoFiles.cpp)
 
 ## 测试与本地安装包
 
@@ -43,7 +56,7 @@ int main() {
 pnpm test
 ```
 
-测试命令先编译 TypeScript 并执行 ESLint，再启动隔离的扩展宿主。宿主禁用额外安装的扩展，在临时工作区测试工具链探测、已有配置迁移，以及 Windows x64 上 C 和 C++ 的断点、单步、终端输入和重新启动。要指定已安装的 VS Code，可先设置 `$env:VSCODE_TEST_EXECUTABLE` 为该安装的 `Code.exe` 完整路径。[测试宿主配置](../.vscode-test.mjs) · [调试集成测试](../src/test/extension.test.ts)
+测试命令先编译 TypeScript 并执行 ESLint，再启动隔离的扩展宿主。宿主禁用额外安装的扩展，在临时工作区测试工具链探测、已有配置迁移，以及 Windows x64 上 C 和 C++ 的断点、单步、终端输入和重新启动。要指定已安装的 VS Code，可先设置 `$env:VSCODE_TEST_EXECUTABLE` 为该安装的 `Code.exe` 完整路径。[测试宿主配置](https://github.com/realsxb/nobrainercpp/blob/main/.vscode-test.mjs) · [调试集成测试](https://github.com/realsxb/nobrainercpp/blob/main/src/test/extension.test.ts)
 
 制作 Windows x64 的本地验收包可以使用微软的打包工具。
 
@@ -52,7 +65,7 @@ pnpm dlx @vscode/vsce ls --no-dependencies
 pnpm dlx @vscode/vsce package --target win32-x64 --no-dependencies --out nbcpp-local.vsix
 ```
 
-第一条命令可检查打包文件清单，重点查看 `out/extension.js`、`bin/terminal-launcher.exe`、`lldbv1.0/` 和 `third-party-notices/`。第二条会在本地生成 VSIX。在 VS Code 的扩展视图中选择「从 VSIX 安装」即可验收。VSIX 的平台标记需与内置原生程序一致。[打包过滤规则](../.vscodeignore) · [VS Code 官方打包说明](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions)
+第一条命令可检查打包文件清单，重点查看 `out/extension.js`、`bin/terminal-launcher.exe`、`lldbv1.0/` 和 `third-party-notices/`。第二条会在本地生成 VSIX。在 VS Code 的扩展视图中选择「从 VSIX 安装」即可验收。已发布的 1.5.0 使用通用 VSIX 标记，内置的原生程序面向 Windows x64。上述本地打包命令显式选择 Windows x64 目标。[打包过滤规则](https://github.com/realsxb/nobrainercpp/blob/main/.vscodeignore) · [VS Code 官方打包说明](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions)
 
 ## 修改原生启动器
 
@@ -66,6 +79,8 @@ pnpm test
 `native/legacy/launcher.cpp` 整理自仓库早已公开的设计笔记，对应根目录历史文件 `launcher.exe` 的主程序。它使用窄字符版 Windows 进程接口，适合研究早期的外部窗口方案。修改 1.5.0 的终端行为请从 C 启动器入手。
 
 ## 内置 LLVM 的组成与构建来历
+
+维护当前工具链时，可在 Linux 或 WSL 中运行仓库的 Python 构建脚本。从仓库根目录执行 `python3 toolchain/build.py --help`，可查看源码版本检查、宿主工具构建、插桩构建、采样训练和最终构建的入口。配套的打包脚本可组装和核验工具链目录。安装并测试扩展时可直接使用仓库中的 `lldbv1.0/`。[构建脚本](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/build.py) · [工具链打包脚本](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/package.py) · [中文工具链构建说明](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/README.zh-CN.md) · [English toolchain build guide](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/README.md)
 
 | 仓库位置 | 用途 |
 | --- | --- |

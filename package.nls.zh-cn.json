@@ -1,0 +1,10 @@
+{
+  "debug.activeFile": "根据当前源文件选择编译器和调试器。",
+  "debug.logFile": "调试日志文件路径。",
+  "debug.program": "要调试的可执行文件的绝对路径。",
+  "debug.args": "传递给程序的命令行参数。",
+  "debug.cwd": "程序的工作目录。",
+  "debug.terminal": "使用 VS Code 集成终端。",
+  "debug.stopAtEntry": "调试开始时在程序入口处暂停。",
+  "debug.env": "程序的环境变量。"
+}

@@ -1,88 +1,84 @@
-# NBCpp - NoBrainerCpp
+# NBCpp (NoBrainerCpp)
 
-[中文](#-简介-introduction) | [English](#-english-readme)
+[简体中文](https://github.com/realsxb/nobrainercpp/blob/main/README.zh-CN.md) · [User guide](https://buaahmjh.com/en/projects/nbcpp) · [Developer notes](https://github.com/realsxb/nobrainercpp/blob/main/docs/development-notes.en.md)
 
-[项目站使用指南](https://buaahmjh.com/projects/nbcpp) | [中文开发笔记 · 源码运行、工具链与调试原理](docs/development-notes.zh-CN.md)
+Compile and debug the active C or C++ source file in VS Code. On Windows x64, NBCpp can use a system compiler or its bundled Clang and LLDB. You can set breakpoints and type input into the integrated terminal, even on a machine without MinGW, Visual Studio or the Microsoft C/C++ extension installed separately.
 
-> **F5 to debug C/C++. No setup, no brain, no problem.**
->
-> 无需配置，一键调试 C/C++。零依赖，即插即用，裸 VS Code 也能跑。
+**Clang, LLD and LLDB in 48.82 MiB of compressed toolchain data.** The bundle includes the Windows x64 tools, runtime libraries and headers used by the examples below.
 
-![logo](smartstart.png)
+## Try it with a C program
 
-## 🚀 简介 (Introduction)
+1. Install **NBCpp** from the Extensions view in **desktop VS Code 1.105 or later (1.x)** on Windows x64. Open a folder you trust where you can save source files and executables. [Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Nebulazeyv-RealSXB.nobrainercpp)
+2. Save the example below as `main.c` in that folder. Click the gutter next to `printf` to set a breakpoint.
+3. Click **Smart Run** in the editor toolbar. When the integrated terminal opens, type `41` and press Enter. At the breakpoint, inspect `n` in **Variables**. Press **F10** to execute the output line. The terminal should display `42`.
 
-**NBCpp** (NoBrainerCpp) 是一个致力于让 C/C++ 开发变得极其简单的 VS Code 插件。
+```c
+#include <stdio.h>
 
-对于很多新手（尤其是 BUAAer 们）来说，配置 VS Code 的 `tasks.json` 和 `launch.json` 简直是噩梦。本插件的初衷就是为了解决这个问题 —— **让你忘记配置，专注于写代码**。
+int main(void) {
+    int n;
+    if (scanf("%d", &n) != 1) return 1;
+    printf("%d\n", n + 1);
+    return 0;
+}
+```
 
-### ✨ 核心特性
+## Launch and control a session
 
-* **零配置 (Zero Config)**: 只要安装插件，打开一个文件夹，选中里面的 C/C++ 文件，点击运行即可。
-* **零依赖 (Zero Dependency)**: 插件内置了微型 LLVM 工具链 (完整Clang + LLDB压缩后大小仅仅50MB！)。即使你的电脑没有安装 MinGW 或 Visual Studio，也能直接编译调试！
-* **智能降级 (Smart Fallback)**:
-    1.  优先搜索系统中已安装的 GCC/Clang/MSVC。
-    2.  如果找不到，自动无缝切换到内置的微型工具链。
-* **自动生成 (Auto Gen)**: 自动生成标准的 VS Code 配置文件，方便你后续学习和修改。
+| Action | How to use it |
+| --- | --- |
+| **Smart Run C/C++** ![Smart Run icon](https://raw.githubusercontent.com/realsxb/nobrainercpp/main/smartstart.png) | Builds the active file in its detected language. Select the editor button or run **C/C++: Smart Run C/C++** from the Command Palette. |
+| **F5** | Starts debugging in a new C/C++ workspace. If VS Code asks you to pick a debugger, choose **NBCpp C/C++**. In a project with a custom launch configuration, F5 follows the selected configuration. Smart Run is available for building just the active file. |
+| **Ctrl+Alt+C** / **Ctrl+Alt+D** | With focus in the editor, choose **C** with the first shortcut or **C++** with the second. |
+| **F10** / **F11** / **Shift+F5** | Step over a line, step into a call or stop debugging. Use **Restart** in the debug toolbar to launch a fresh process. |
 
----
+## What you can build
 
-## 📖 用法 (Usage)
+| | Examples verified with the bundled toolchain |
+| --- | --- |
+| **C** | Read values with `scanf`, store them in arrays and structures, compare C strings, print a result and read or write a file with the C standard I/O library. |
+| **C++** | Use `std::cin` and `std::cout`, write classes and templates, store strings in a `std::vector`, sort them with `std::sort` and work with files using streams. The bundle also includes a `bits/stdc++.h` convenience header for exercises that use it. |
 
-### 1. 极速模式 (推荐)
-先用vscode打开一个文件夹，再点击任意 `.c` 或 `.cpp` 文件，点击编辑器右上角的 **Smart Run** 图标（或者按 `F5`）。
-插件会自动检测环境、生成配置并启动调试。Windows x64 上，即使没有安装微软 C/C++ 扩展，也可以在代码行旁设置断点，按 F5 启动，在 VS Code 集成终端中给 `scanf` 或 `std::cin` 输入数据，按 F10 单步执行。已有自定义 `launch.json` 的项目可以通过 **Smart Run** 调试当前文件。
+For a C++ exercise, save this as `main.cpp`, start **Smart Run**, then enter `7 2 5`. Set a breakpoint on the output line. Step over it to print the smallest value, `2`.
 
-### 2. 手动模式
-你也可以使用快捷键强制启动特定语言的调试：
-* **Debug C**: `Ctrl + Alt + C`
-* **Debug C++**: `Ctrl + Alt + D`
+```cpp
+#include <algorithm>
+#include <iostream>
+#include <vector>
 
----
+int main() {
+    std::vector<int> numbers(3);
+    for (int& n : numbers) {
+        if (!(std::cin >> n)) return 1;
+    }
+    std::sort(numbers.begin(), numbers.end());
+    std::cout << numbers.front() << '\n';
+}
+```
 
-## 🛠️ 关于工具链 (About Toolchain)
+The automatic build compiles **one source file** with debug information, writes the executable next to the source and runs it with the source directory as its working directory. Local headers can be included as usual. The bundled compilers have been tested with C17 and C++17 examples. Generated GNU and Clang tasks use the compiler's default language standard. A project that needs an explicit standard can set it in its own build task. Projects with multiple separately compiled source files, CMake targets, custom linker flags or external SDKs need their own build tasks. The bundled toolchain targets Windows x64 console programs. Its Windows libraries and headers are a selected subset.
 
-本插件采用了独特的 **"双保险"** 策略：
+## How NBCpp chooses a toolchain
 
-1.  **System Toolchain (优先)**:
-    插件会尝试扫描你 PATH 环境变量中的 GCC (MinGW), Clang (LLVM) 或 MSVC。如果找到了，优先使用它们，以获得最佳的系统兼容性。
+NBCpp checks the directories on PATH for GNU, Clang and MSVC concurrently. The first usable set for the active file can start the initial build while discovery continues. Later runs can use a preferred complete toolchain. MSVC requires a developer environment with its include and library paths configured. If the system has a C compiler only, the bundled Clang++ can still build a C++ exercise.
 
-2.  **Embedded Toolchain (兜底)**:
-    如果你的系统极其纯净（什么都没装），插件会激活内置的 **Micro-LLVM** 环境。
-    * 体积仅约 30MB（压缩后）。
-    * 包含 `clang`, `clang++`, `lld`, `lldb-dap`。
-    * 完全独立，不污染系统环境变量。
+With the Microsoft C/C++ extension, NBCpp can use its GDB integration or Visual Studio debugger with a matching system toolchain. The bundled LLDB path uses a small Windows launcher to start your program in a VS Code terminal and attach before it runs past the first breakpoint. The status bar briefly shows the compiler and debugger for each run.
 
-*Smart Run 会在状态栏显示本次使用的编译器和调试器。*
+NBCpp can generate `.vscode/tasks.json`, `launch.json` and `c_cpp_properties.json` in an open folder. It recognizes its own generated files and preserves user-edited configurations. The IntelliSense configuration can be used by the Microsoft C/C++ extension if installed.
 
----
+## Bundled toolchain size
 
-## 🤝 反馈与贡献 (Feedback)
+The bundled Clang, LLD and LLDB tools report version **21.1.8**. Inside the VSIX, the bundled Windows x64 toolchain occupies 2,697 files under `lldbv1.0/`. Their ZIP entries contain 51,190,475 bytes of compressed data. Their unpacked file contents total **169.06 MiB** (177,267,939 bytes). The complete VSIX also contains the extension, launcher, documentation and archive metadata.
 
-遇到问题或想提出建议，欢迎提交 [GitHub Issue](https://github.com/realsxb/nobrainercpp/issues)。报告调试问题时，请注明 Windows、VS Code 和 NBCpp 的版本，并附上能复现问题的最小 C 或 C++ 程序。
+## Source and support
 
-**如果你觉得这个插件好用，请在 GitHub 上给个 Star ⭐️，这对我很重要！**
+The extension and native launcher are available under the repository's MIT license. The bundled LLVM and MinGW-w64 components retain their upstream licenses. For a problem report, include your Windows, VS Code and NBCpp versions, the compiler shown in the status bar and a small program that reproduces the issue.
 
----
+- [Publisher website](https://buaahmjh.com/en) · [NBCpp user guide](https://buaahmjh.com/en/projects/nbcpp)
+- [Run and test the extension from source](https://github.com/realsxb/nobrainercpp/blob/main/docs/development-notes.en.md) · [Native launcher source](https://github.com/realsxb/nobrainercpp/blob/main/native/terminal-launcher.c)
+- [Toolchain build guide](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/README.md) · [Toolchain build script](https://github.com/realsxb/nobrainercpp/blob/main/toolchain/build.py)
+- [License](https://github.com/realsxb/nobrainercpp/blob/main/LICENSE) · [Third-party notices](https://github.com/realsxb/nobrainercpp/tree/main/third-party-notices) · [Report an issue](https://github.com/realsxb/nobrainercpp/issues)
 
-## 🇬🇧 English Readme
+## 中文快速入门
 
-### What is NBCpp?
-**NBCpp** is a VS Code extension designed to make C/C++ development effortlessly simple. It allows you to compile and debug C/C++ code immediately after installation, without any manual configuration.
-
-### Key Features
-* **Out-of-the-Box**: Just click run. No need to write `tasks.json` or `launch.json`.
-* **Embedded Toolchain**: Comes with a built-in micro LLVM toolchain. Works even on a fresh Windows installation without MinGW/VS.
-* **Smart Detection**: Automatically detects system compilers (GCC/Clang/MSVC) and falls back to the embedded one if none are found.
-
-### How to use
-1.  Open a folder and select`.c` or `.cpp` file.
-2.  Click the **Smart Run** button in the top-right corner.
-3.  Set a breakpoint, use F10 to step over, and enter program input in the integrated terminal. The bundled debugger supports Windows x64, including installations without the Microsoft C/C++ extension.
-
-### Contact
-* **Author**: RealSXB(Nebulazeyv)
-* **Project guide**: [NBCpp on the publisher’s website](https://buaahmjh.com/projects/nbcpp)
-* **Support and feature requests**: [GitHub Issues](https://github.com/realsxb/nobrainercpp/issues)
----
-_Generated by NoBrainerCpp | Make C++ Simple Again!_
+在 Windows x64 的桌面版 VS Code 中安装 NBCpp，用「打开文件夹」打开练习目录，保存一个带 `main` 函数的 `.c` 或 `.cpp` 文件。点击编辑器右上角 **Smart Run**。新工作区也可按 **F5**，遇到调试器选择时选 **NBCpp C/C++**。在行号左侧设置断点，在集成终端给 `scanf` 或 `std::cin` 输入数据，按 **F10** 单步执行。[完整中文说明](https://github.com/realsxb/nobrainercpp/blob/main/README.zh-CN.md) · [中文使用指南](https://buaahmjh.com/projects/nbcpp)

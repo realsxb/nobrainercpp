@@ -1,0 +1,10 @@
+{
+  "debug.activeFile": "Choose the compiler and debugger for the active source file.",
+  "debug.logFile": "Path to the debugger log file.",
+  "debug.program": "Absolute path to the executable to debug.",
+  "debug.args": "Command-line arguments to pass to the program.",
+  "debug.cwd": "Working directory of the program.",
+  "debug.terminal": "Use the integrated terminal in VS Code.",
+  "debug.stopAtEntry": "Pause at the entry point when debugging starts.",
+  "debug.env": "Environment variables for the program."
+}
